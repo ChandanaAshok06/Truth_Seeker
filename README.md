@@ -78,7 +78,7 @@ We welcome contributions! To contribute:
 This tool is designed to assist in identifying potential misinformation for educational and analytical purposes. While it uses advanced AI models, no detection system is 100% accurate. Always cross-reference with multiple reliable primary sources before drawing definitive conclusions.
 
 ## 👤 Author
-ChandanaAshok06  
+Chandana A  
 GitHub: @ChandanaAshok06  
 
 ## 🌐 Live Demo
