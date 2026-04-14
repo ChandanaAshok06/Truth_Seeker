@@ -16,6 +16,8 @@ from pathlib import Path
 from dotenv import load_dotenv
 from typing import Dict, Optional
 import time
+import zipfile
+import urllib.request
 import pickle
 
 import streamlit as st
@@ -183,10 +185,22 @@ st.markdown("""
 # ======================================================================================
 # MODEL LOADING (CACHED)
 # ======================================================================================
+@st.cache_resource
+def download_and_extract_models():
+    """Download models from GitHub Releases if they don't exist."""
+    if not os.path.exists("./models/bert/config.json"):
+        with st.spinner("Downloading trained models (this takes about a minute on first boot)..."):
+            url = "https://github.com/ChandanaAshok06/Truth_Seeker/releases/download/v1.0/models.zip"
+            urllib.request.urlretrieve(url, "models.zip")
+            with zipfile.ZipFile("models.zip", 'r') as zip_ref:
+                zip_ref.extractall(".")
+            os.remove("models.zip")
+            logger.info("✅ Models downloaded and extracted!")
 
 @st.cache_resource
 def load_models():
     """Load all models with caching."""
+    download_and_extract_models()
     try:
         logger.info("Loading models...")
         
