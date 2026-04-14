@@ -1,0 +1,12 @@
+# Ignore heavy data and models
+data/
+models/
+bert_results/
+*.csv
+*.tsv
+
+# Ignore environment and secrets
+venv/
+.env
+__pycache__/
+*.log
