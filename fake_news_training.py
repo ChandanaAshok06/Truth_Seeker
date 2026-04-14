@@ -990,9 +990,9 @@ def main():
     
     try:
         combined_data = data_loader.load_datasets(
-            fake_csv="new_fake.csv",
-            true_csv="new_true.csv",
-            liar_tsv="train.tsv"
+            fake_csv="data/new_fake.csv",
+            true_csv="data/new_true.csv",
+            liar_tsv="data/train.tsv"
         )
     except FileNotFoundError:
         logger.error("❌ Dataset files not found. Please ensure fake.csv, true.csv, and train.tsv exist.")
