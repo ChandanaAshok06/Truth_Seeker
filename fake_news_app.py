@@ -62,8 +62,8 @@ API_KEY = os.getenv("NEWS_API_KEY")
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 CONFIG = {
-    'similarity_threshold_strong': 0.65,
-    'similarity_threshold_partial': 0.35,
+    'similarity_threshold_strong': 0.75,
+    'similarity_threshold_partial': 0.60,
     'bert_max_length': 512,
     'input_min_length': 10,
     'input_max_length': 512,
@@ -458,16 +458,17 @@ def make_prediction(text: str, models: dict) -> dict:
         # Find all numbers in the best matching article headline
         match_numbers = set(re.findall(r'\b\d+\b', best_match))
         
-        # If the user typed a number, but that exact number isn't in the headline
-        if input_numbers and not input_numbers.intersection(match_numbers):
-            # Penalize the score by 25% for missing crucial numerical facts
-            best_score = best_score * 0.75 
-            logger.info(f"Penalized score to {best_score} due to number mismatch.")
+        # Find which numbers the user typed that are MISSING from the headline
+        missing_numbers = input_numbers - match_numbers
+        
+        # If the user typed a number (like '10') that isn't in the headline, penalize it!
+        if missing_numbers:
+            best_score = best_score * 0.70 
+            logger.info(f"Penalized score to {best_score} because headline is missing: {missing_numbers}")
         # ----------------------------------
-
         result['best_match_score'] = best_score
         result['best_match_article'] = best_match
-        
+
         # --- NEW UNIFIED SCORE LOGIC ---
         # Convert BERT prediction to a strict "Realness" probability (0.0 to 1.0)
         bert_real_score = result['bert_confidence'] if "Real" in bert_pred else (1.0 - result['bert_confidence'])
