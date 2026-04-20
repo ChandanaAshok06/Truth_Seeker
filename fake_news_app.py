@@ -447,21 +447,47 @@ def make_prediction(text: str, models: dict) -> dict:
         best_score = float(max(sim_scores))
         best_idx = int(np.argmax(sim_scores))
         best_match = news[best_idx]
+        best_score = float(max(sim_scores))
+        best_idx = int(np.argmax(sim_scores))
+        best_match = news[best_idx]
         
+        # --- NEW: STRICT NUMBER PENALTY ---
+        import re
+        # Find all numbers in the user's input
+        input_numbers = set(re.findall(r'\b\d+\b', text))
+        # Find all numbers in the best matching article headline
+        match_numbers = set(re.findall(r'\b\d+\b', best_match))
+        
+        # If the user typed a number, but that exact number isn't in the headline
+        if input_numbers and not input_numbers.intersection(match_numbers):
+            # Penalize the score by 25% for missing crucial numerical facts
+            best_score = best_score * 0.75 
+            logger.info(f"Penalized score to {best_score} due to number mismatch.")
+        # ----------------------------------
+
         result['best_match_score'] = best_score
         result['best_match_article'] = best_match
         
+        # --- NEW UNIFIED SCORE LOGIC ---
+        # Convert BERT prediction to a strict "Realness" probability (0.0 to 1.0)
+        bert_real_score = result['bert_confidence'] if "Real" in bert_pred else (1.0 - result['bert_confidence'])
+        
+        # Calculate the blended score: 70% weight to Live Verification, 30% to BERT
+        unified_score = (best_score * 0.70) + (bert_real_score * 0.30)
+        result['unified_score'] = float(unified_score)
+        # -------------------------------
+        
         # Determine verdict
-        if best_score > CONFIG['similarity_threshold_strong']:
-            result['final_verdict'] = f"✅ Real News\n\n**Strongly Verified**\nSimilarity: {best_score:.2%}"
+        if unified_score > CONFIG['similarity_threshold_strong']:
+            result['final_verdict'] = f"✅ Real News\n\n**Strongly Verified**\nTrust Score: {unified_score:.2%}"
             result['verification_status'] = "STRONGLY_VERIFIED"
-        elif best_score > CONFIG['similarity_threshold_partial']:
-            result['final_verdict'] = f"🟡 Possibly Real\n\n**Partially Verified**\nSimilarity: {best_score:.2%}"
+        elif unified_score > CONFIG['similarity_threshold_partial']:
+            result['final_verdict'] = f"🟡 Possibly Real\n\n**Partially Verified**\nTrust Score: {unified_score:.2%}"
             result['verification_status'] = "PARTIALLY_VERIFIED"
         else:
-            result['final_verdict'] = f"{bert_pred}\n\n**Not Verified**\nBased on ML Model\nConfidence: {bert_conf:.2%}"
+            result['final_verdict'] = f"🔴 Likely Fake\n\n**Not Verified**\nTrust Score: {unified_score:.2%}"
             result['verification_status'] = "NOT_VERIFIED"
-        
+
         return result
     
     except Exception as e:
@@ -529,58 +555,41 @@ with tab1:
                 st.markdown("---")
                 st.markdown("## 📊 Results")
                 
-                # Main verdict
+                # 1. Main Verdict Box
                 if result['verification_status'] == 'STRONGLY_VERIFIED':
                     st.success(result['final_verdict'])
                 elif result['verification_status'] == 'PARTIALLY_VERIFIED':
                     st.warning(result['final_verdict'])
                 else:
-                    st.info(result['final_verdict'])
+                    st.error(result['final_verdict'])
                 
-                # Details
-                col1, col2, col3 = st.columns(3)
+                st.markdown("---")
                 
-                with col1:
-                    st.metric(
-                        "BERT Prediction",
-                        result['bert_prediction'],
-                        f"{result['bert_confidence']:.1%} confidence"
-                    )
+                # 2. Unified Trust Score UI
+                st.markdown("### 🎯 Overall Trust Score")
+                st.progress(min(result['unified_score'], 1.0))
+                st.metric(
+                    "Credibility Rating", 
+                    f"{result['unified_score']:.1%}",
+                    "Based on AI Analysis + Live Verification"
+                )
                 
-                with col2:
-                    st.metric(
-                        "Similarity Score",
-                        f"{result['best_match_score']:.2f}",
-                        "Match confidence"
-                    )
+                with st.expander("⚙️ View Raw Technical Metrics"):
+                    st.write(f"**BERT Language Analysis:** {result['bert_prediction']} ({result['bert_confidence']:.1%})")
+                    st.write(f"**Live Article Similarity:** {result['best_match_score']:.1%}")
                 
-                with col3:
-                    st.metric(
-                        "Verification Status",
-                        result['verification_status'],
-                        "Current status"
-                    )
+                st.markdown("---")
                 
-                # Matched articles
-                if result['news_articles']:
-                    st.markdown("### 📰 Top Matching Articles")
-                    
-                    for i, article in enumerate(result['news_articles'][:3], 1):
-                        with st.expander(f"Article {i}", expanded=(i==1)):
-                            st.write(article)
+                # 3. Top Matching Articles
+                st.markdown("### 📰 Top Matching Articles")
                 
-                # Confidence gauge
-                st.markdown("### 📈 Confidence Breakdown")
-                col1, col2 = st.columns(2)
-                
-                with col1:
-                    st.metric("BERT Confidence", f"{result['bert_confidence']:.1%}")
-                    st.progress(result['bert_confidence'])
-                
-                with col2:
-                    st.metric("Similarity Score", f"{result['best_match_score']:.1%}")
-                    st.progress(min(result['best_match_score'], 1.0))
-
+                # Loop through the live news articles we fetched
+                if result.get('news_articles'):
+                    for i, article_title in enumerate(result['news_articles'][:3]):
+                        with st.expander(f"Article {i+1}: {article_title}"):
+                            st.write("Found via Google News / NewsAPI live search.")
+                else:
+                    st.info("No matching live articles were found on the internet for this text.")
 # ======================================================================================
 # TAB 2: ANALYTICS
 # ======================================================================================
